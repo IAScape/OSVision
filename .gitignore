@@ -130,3 +130,6 @@ dmypy.json
 
 # Torch
 *.pth
+
+# Mac
+.DS_Store
