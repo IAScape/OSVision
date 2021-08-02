@@ -21,6 +21,7 @@ def plot_prediction(img, prediction, labels, tot_categories=100):
                                 prediction['scores']):  
         x1, y1, x2, y2 = bbox
         # Change
+        cat = 'tag'
         color = colors[1] #colors[labels[cat]]
         box_h = abs(y2 - y1)
         box_w = abs(x2 - x1)
