@@ -1,10 +1,12 @@
 import torchvision 
-from torchvision import transforms
+from torchvision import transforms, models
+from .helpers import _show_image, _plot_prediction
 import torch
-from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 import ssl
 
 ssl._create_default_https_context = ssl._create_unverified_context
+
+FastRCNNPredictor = models.detection.faster_rcnn.FastRCNNPredictor
 
 labels = {
     1: 'tag',
@@ -23,13 +25,23 @@ class ImageDetector():
                                 transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                      std=[0.229, 0.224, 0.225])])
 
-    def _load_model(self, path, num_classes=2):
+    @staticmethod
+    def _load_model(path, num_classes=2):
         model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
         in_features = model.roi_heads.box_predictor.cls_score.in_features
         model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
         weigths = torch.load(path, map_location=torch.device('cpu'))
         model.load_state_dict(weigths)
         return model
+
+    @staticmethod
+    def show_image(img):
+        _show_image(img)
+
+    @staticmethod
+    def plot_prediction(img, prediction):
+        labels_inv = {v: k for (k, v) in labels.items()}
+        _plot_prediction(img, prediction, labels_inv, 4)
 
     def get_bounding(self, img, threshold=0.5):
         # To Do:
@@ -39,16 +51,21 @@ class ImageDetector():
         img = img.resize((221, 221))
         img = self.transform(img)
 
+        img = img.unsqueeze(0)
+        img = torch.Tensor(img)
+
         with torch.no_grad():
-            out = self.model([img])[0]
-        filtered_out = []
-        for box, label, score in zip(out['boxes'], out['labels'], out['scores']):
-            if score > threshold:
-                inv_x = 1 / x_scale
-                inv_y = 1 / y_scale
-                box = [box[0] * inv_x, box[1] * inv_y, box[2] * inv_x, box[3] * inv_y]
-                filtered_out.append((labels[label.item()], box, score))
-        return filtered_out
+            prediction = self.model(img)[0]
+    
+        filtered_pred = {'boxes': [], 'labels': [], 'scores': []}
+        for box, cat, prob in zip(prediction['boxes'], prediction['labels'],
+                                prediction['scores']):
+            if prob > threshold:
+                box_scaled = [box[0].item() / x_scale, box[1].item() / y_scale, box[2].item() / x_scale, box[3].item() / y_scale]
+                filtered_pred['boxes'].append(box_scaled)
+                filtered_pred['labels'].append(cat)
+                filtered_pred['scores'].append(round(float(prob), 3))
+        return filtered_pred
 
 
 if __name__ == '__main__':
